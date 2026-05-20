@@ -17,6 +17,7 @@ const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'AI_Study_Assistant_PDFs', 
+    resource_type: 'raw',
     allowed_formats: ['pdf'], // We only want PDFs for now
   },
 });

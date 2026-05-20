@@ -19,6 +19,16 @@ const documentSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    extractedText: {
+      type: String,
+      default: '',
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'processing', 'completed', 'failed'],
+      default: 'pending',
+    },
+
   },
   {
     timestamps: true,

@@ -1,4 +1,5 @@
 const Document = require('../models/Document');
+const { pdfQueue } = require('../workers/pdfQueue');
 
 // @desc    Upload a PDF document
 // @route   POST /api/documents/upload
@@ -15,6 +16,10 @@ const uploadDocument = async (req, res) => {
       title: req.file.originalname,
       fileUrl: req.file.path, // The secure Cloudinary URL
       cloudinaryId: req.file.filename,
+    });
+    await pdfQueue.add('extract-text', {
+      documentId: document._id,
+      fileUrl: document.fileUrl,
     });
 
     res.status(201).json(document);

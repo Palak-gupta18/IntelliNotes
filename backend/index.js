@@ -4,6 +4,8 @@ const dotenv = require('dotenv');
 const connectDB = require('./config/db'); // <-- Import the DB connection
 const userRoutes = require('./routes/userRoutes');
 const documentRoutes = require('./routes/documentRoutes');
+require('./workers/pdfWorker');
+
 // Load environment variables
 dotenv.config();
 
