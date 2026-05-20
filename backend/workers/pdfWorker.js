@@ -2,42 +2,96 @@ const { Worker } = require('bullmq');
 const { connection } = require('./pdfQueue');
 const Document = require('../models/Document');
 const pdfParse = require('pdf-parse');
-const axios = require('axios'); // We need axios to download the PDF from Cloudinary
+const axios = require('axios');
+const { chunkText } = require('../utils/chunkText');
+
+// Setup Gemini and Pinecone
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { Pinecone } = require('@pinecone-database/pinecone');
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
+const index = pinecone.Index(process.env.PINECONE_INDEX_NAME);
 
 const worker = new Worker('pdf-extraction', async (job) => {
     const { documentId, fileUrl } = job.data;
     
-    // Update status to processing
     await Document.findByIdAndUpdate(documentId, { status: 'processing' });
 
     try {
-        console.log(`Starting extraction for document ${documentId}`);
-        
-        // 1. Download PDF from Cloudinary as a buffer
+        console.log(`1. Downloading PDF...`);
         const response = await axios.get(fileUrl, { responseType: 'arraybuffer' });
         const dataBuffer = Buffer.from(response.data);
 
-        // 2. Parse the PDF
+        console.log(`2. Parsing PDF...`);
         const pdfData = await pdfParse(dataBuffer);
+        const extractedText = pdfData.text || '';
         
-        // 3. Save extracted text to database
+        console.log(`3. Chunking Text... (Found ${extractedText.length} characters)`);
+        
+        // If the PDF had no text (e.g. it was just images), stop here.
+        if (extractedText.trim().length === 0) {
+            console.log('No text found in PDF. Skipping embeddings.');
+            await Document.findByIdAndUpdate(documentId, { status: 'completed' });
+            return { success: true };
+        }
+
+        const chunks = chunkText(extractedText);
+        console.log(` -> Split into ${chunks.length} chunks.`);
+
+        console.log(`4. Generating Embeddings & Saving to Pinecone...`);
+        const embeddingModel = genAI.getGenerativeModel({ model: "gemini-embedding-001"});
+        
+        const vectors = [];
+        for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i];
+            const result = await embeddingModel.embedContent(chunk);
+            
+            // Slice the 3072 array down to 768 for your Pinecone index
+           const embeddingValues = Array.from(result.embedding.values).slice(0, 768);
+
+
+            vectors.push({
+                id: `${documentId}-chunk-${i}`,
+                values: embeddingValues,
+                metadata: {
+                    documentId: documentId.toString(),
+                    text: chunk
+                }
+            });
+        }
+
+        console.log(` -> Sending ${vectors.length} vectors to Pinecone.`);
+
+        // Only upsert if we actually have vectors
+               if (vectors.length > 0) {
+            console.log("Sample vector being sent:", JSON.stringify(vectors[0]).substring(0, 150) + "...");
+            try {
+                await index.upsert(vectors);
+            } catch (err) {
+                // Fallback for some Pinecone SDK versions
+                await index.upsert({ records: vectors });
+            }
+        }
+
+
+        console.log(`5. Finishing up...`);
         await Document.findByIdAndUpdate(documentId, {
-            extractedText: pdfData.text,
+            extractedText: extractedText,
             status: 'completed'
         });
 
-        console.log(`Finished extraction for document ${documentId}`);
+        console.log(`Successfully completed RAG Pipeline for document ${documentId}`);
         return { success: true };
     } catch (error) {
-        console.error(`Error processing document ${documentId}:`, error);
+        console.error(`Error in RAG pipeline:`, error);
         await Document.findByIdAndUpdate(documentId, { status: 'failed' });
-        throw error; // This tells BullMQ the job failed
+        throw error; 
     }
 }, { connection });
 
-// Handle worker errors
 worker.on('failed', (job, err) => {
-  console.log(`${job.id} has failed with ${err.message}`);
+  console.log(`Job ${job.id} has failed with ${err.message}`);
 });
 
 module.exports = worker;
