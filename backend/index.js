@@ -5,6 +5,7 @@ const connectDB = require('./config/db'); // <-- Import the DB connection
 const userRoutes = require('./routes/userRoutes');
 const documentRoutes = require('./routes/documentRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 require('./workers/pdfWorker');
 
 // Load environment variables
@@ -22,6 +23,7 @@ app.use(express.json());
 app.use('/api/users', userRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/chat', chatRoutes);
 // Basic Route
 app.get('/', (req, res) => {
   res.send('AI Study Assistant Backend is running with JavaScript!');
