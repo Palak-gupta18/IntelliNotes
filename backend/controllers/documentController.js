@@ -27,5 +27,13 @@ const uploadDocument = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+const getUserDocuments = async (req, res) => {
+  try {
+    const documents = await Document.find({ user: req.user._id }).sort({ createdAt: -1 });
+    res.status(200).json(documents);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+module.exports = { uploadDocument, getUserDocuments };
 
-module.exports = { uploadDocument };
