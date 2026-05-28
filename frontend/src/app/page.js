@@ -1,64 +1,124 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
 
-export default function Home() {
+import { useContext, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { AuthContext } from '../context/AuthContext';
+import api from '../utils/api';
+import styles from './page.module.css';
+
+export default function Dashboard() {
+  const { user, loading, logout } = useContext(AuthContext);
+  const router = useRouter();
+  
+  const [documents, setDocuments] = useState([]);
+  const [uploading, setUploading] = useState(false);
+
+  // 1. Protect the route: if not logged in, go to login page
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
+
+  // 2. Fetch the user's documents when the page loads
+  useEffect(() => {
+    if (user) {
+      fetchDocuments();
+    }
+  }, [user]);
+
+  const fetchDocuments = async () => {
+    try {
+      const { data } = await api.get('/documents');
+      setDocuments(data);
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+    }
+  };
+
+  // 3. Handle PDF Upload
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Must use FormData to send files via HTTP
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      setUploading(true);
+      // POST to our backend upload endpoint
+      await api.post('/documents/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      // Refresh the list after upload
+      fetchDocuments();
+    } catch (error) {
+      console.error('Upload failed:', error);
+      alert('Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Show a blank/loading screen while checking auth state
+  if (loading || !user) return null;
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.js file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className={styles.container}>
+      {/* Top Navigation */}
+      <header className={styles.header}>
+        <div className={styles.logo}>IntelliNotes</div>
+        <div className={styles.userInfo}>
+          <span>Hello, {user.name.split(' ')[0]} 👋</span>
+          <button onClick={logout} className={styles.logoutBtn}>Logout</button>
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+      </header>
+
+      {/* Main Content */}
+      <main>
+        <div className={styles.uploadSection}>
+          <div>
+            <h2>Your Study Materials</h2>
+            <p style={{ color: 'var(--text-muted)', marginTop: '5px' }}>
+              Upload a new PDF to generate summaries and quizzes.
+            </p>
+          </div>
+          
+          <label className={styles.uploadLabel}>
+            <input 
+              type="file" 
+              accept=".pdf" 
+              className={styles.fileInput} 
+              onChange={handleFileUpload}
+              disabled={uploading}
             />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <div className="btn-primary" style={{ pointerEvents: 'none' }}>
+              {uploading ? 'Uploading...' : '+ Upload PDF'}
+            </div>
+          </label>
+        </div>
+
+        {/* Document Grid */}
+        <div className={styles.grid}>
+          {documents.length === 0 ? (
+            <div className={styles.emptyState}>
+              <h3>No documents yet</h3>
+              <p>Upload your first PDF to get started!</p>
+            </div>
+          ) : (
+            documents.map((doc) => (
+              <Link href={`/document/${doc._id}`} key={doc._id} className={`glass-panel ${styles.docCard}`}>
+                <div className={styles.docIcon}>📄</div>
+                <h3 className={styles.docTitle}>{doc.title}</h3>
+                <div className={styles.docDate}>
+                  Uploaded on {new Date(doc.createdAt).toLocaleDateString()}
+                </div>
+              </Link>
+            ))
+          )}
         </div>
       </main>
     </div>
