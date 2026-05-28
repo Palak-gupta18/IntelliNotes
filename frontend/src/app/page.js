@@ -14,63 +14,64 @@ export default function Dashboard() {
   const [documents, setDocuments] = useState([]);
   const [uploading, setUploading] = useState(false);
 
-  // 1. Protect the route: if not logged in, go to login page
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
-    }
+    if (!loading && !user) router.push('/login');
   }, [user, loading, router]);
 
-  // 2. Fetch the user's documents when the page loads
   useEffect(() => {
-    if (user) {
-      fetchDocuments();
-    }
+    if (user) fetchDocuments();
   }, [user]);
 
-   const fetchDocuments = async () => {
+  const fetchDocuments = async () => {
     try {
       const { data } = await api.get('/documents');
-      // Spread the data into a new array to force React to re-render the screen
-      setDocuments([...data]); 
+      setDocuments([...data]);
     } catch (error) {
       console.error('Error fetching documents:', error);
     }
   };
 
-
-  // 3. Handle PDF Upload
+  // Improved Upload: Redirects to the document immediately after upload!
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Must use FormData to send files via HTTP
     const formData = new FormData();
     formData.append('file', file);
 
     try {
       setUploading(true);
-      // POST to our backend upload endpoint
-      await api.post('/documents/upload', formData, {
+      const { data } = await api.post('/documents/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
-      // Refresh the list after upload
-      fetchDocuments();
+      // Navigate to the newly uploaded document!
+      router.push(`/document/${data._id}`);
     } catch (error) {
-      console.error('Upload failed:', error);
       alert('Upload failed. Please try again.');
     } finally {
       setUploading(false);
+      e.target.value = ''; // Reset input
     }
   };
 
-  // Show a blank/loading screen while checking auth state
+  // NEW: Delete Function
+  const handleDelete = async (e, id) => {
+    e.preventDefault(); // Stop the Link from navigating when we click delete
+    if (!window.confirm("Are you sure you want to delete this PDF?")) return;
+
+    try {
+      await api.delete(`/documents/${id}`);
+      fetchDocuments(); // Refresh the grid
+    } catch (error) {
+      alert("Failed to delete document.");
+    }
+  };
+
   if (loading || !user) return null;
 
   return (
     <div className={styles.container}>
-      {/* Top Navigation */}
       <header className={styles.header}>
         <div className={styles.logo}>IntelliNotes</div>
         <div className={styles.userInfo}>
@@ -79,31 +80,21 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main>
         <div className={styles.uploadSection}>
           <div>
             <h2>Your Study Materials</h2>
-            <p style={{ color: 'var(--text-muted)', marginTop: '5px' }}>
-              Upload a new PDF to generate summaries and quizzes.
-            </p>
+            <p style={{ color: 'var(--text-muted)', marginTop: '5px' }}>Upload a new PDF to generate summaries and quizzes.</p>
           </div>
           
           <label className={styles.uploadLabel}>
-            <input 
-              type="file" 
-              accept=".pdf" 
-              className={styles.fileInput} 
-              onChange={handleFileUpload}
-              disabled={uploading}
-            />
+            <input type="file" accept=".pdf" className={styles.fileInput} onChange={handleFileUpload} disabled={uploading} />
             <div className="btn-primary" style={{ pointerEvents: 'none' }}>
-              {uploading ? 'Uploading...' : '+ Upload PDF'}
+              {uploading ? 'Uploading & Analyzing...' : '+ Upload PDF'}
             </div>
           </label>
         </div>
 
-        {/* Document Grid */}
         <div className={styles.grid}>
           {documents.length === 0 ? (
             <div className={styles.emptyState}>
@@ -115,8 +106,15 @@ export default function Dashboard() {
               <Link href={`/document/${doc._id}`} key={doc._id} className={`glass-panel ${styles.docCard}`}>
                 <div className={styles.docIcon}>📄</div>
                 <h3 className={styles.docTitle}>{doc.title}</h3>
-                <div className={styles.docDate}>
-                  Uploaded on {new Date(doc.createdAt).toLocaleDateString()}
+                
+                {/* NEW: Card Actions with Delete Button */}
+                <div className={styles.cardActions}>
+                  <div className={styles.docDate}>
+                    {new Date(doc.createdAt).toLocaleDateString()}
+                  </div>
+                  <button className={styles.deleteBtn} onClick={(e) => handleDelete(e, doc._id)}>
+                    Delete
+                  </button>
                 </div>
               </Link>
             ))

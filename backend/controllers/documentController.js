@@ -51,7 +51,20 @@ const deleteDocument = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+// @desc    Get a single document by ID
+// @route   GET /api/documents/:id
+// @access  Private
+const getDocumentById = async (req, res) => {
+  try {
+    const document = await Document.findOne({ _id: req.params.id, user: req.user._id });
+    if (!document) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+    res.status(200).json(document);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
-module.exports = { uploadDocument, getUserDocuments, deleteDocument };
-
+module.exports = { uploadDocument, getUserDocuments, deleteDocument, getDocumentById };
 
