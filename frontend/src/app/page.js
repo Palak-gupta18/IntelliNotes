@@ -28,14 +28,16 @@ export default function Dashboard() {
     }
   }, [user]);
 
-  const fetchDocuments = async () => {
+   const fetchDocuments = async () => {
     try {
       const { data } = await api.get('/documents');
-      setDocuments(data);
+      // Spread the data into a new array to force React to re-render the screen
+      setDocuments([...data]); 
     } catch (error) {
       console.error('Error fetching documents:', error);
     }
   };
+
 
   // 3. Handle PDF Upload
   const handleFileUpload = async (e) => {
