@@ -36,7 +36,8 @@ const worker = new Worker('pdf-extraction', async (job) => {
             return { success: true };
         }
 
-        const chunks = chunkText(extractedText);
+       // const chunks = chunkText(extractedText);
+          const chunks = chunkText(extractedText).filter(chunk => chunk.trim().length > 0);
         console.log(` -> Split into ${chunks.length} chunks.`);
 
         console.log(`4. Generating Embeddings & Saving to Pinecone...`);

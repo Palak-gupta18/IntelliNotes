@@ -18,6 +18,7 @@ export default function DocumentStudyView() {
   const [chatHistory, setChatHistory] = useState([{ role: 'ai', text: 'Hello! I have analyzed this document. What would you like to know?' }]);
   const [summary, setSummary] = useState('');
   const [quiz, setQuiz] = useState(null);
+  const [selectedAnswers, setSelectedAnswers] = useState({});
   const [flashcards, setFlashcards] = useState(null);
   
   const [loadingFeature, setLoadingFeature] = useState(false);
@@ -147,17 +148,109 @@ export default function DocumentStudyView() {
           )}
 
           {/* QUIZ TAB */}
+             {/* QUIZ TAB */}
           {activeTab === 'quiz' && (
             <div>
               <h2>Knowledge Check</h2>
               {loadingFeature ? <p>Generating questions...</p> : (
                 <div style={{ marginTop: '20px' }}>
-                  {quiz?.map((q, i) => (
-                    <div key={i} style={{ marginBottom: '30px' }}>
-                      <p className={styles.quizQuestion}>{i + 1}. {q.question}</p>
-                      {q.options.map((opt, j) => (
-                        <button key={j} className={styles.quizOption}>{opt}</button>
-                      ))}
+                  {quiz?.map((q, i) => {
+                    const answered = selectedAnswers[i];
+                    return (
+                      <div key={i} style={{ marginBottom: '30px', padding: '15px', background: 'rgba(255,255,255,0.05)', borderRadius: '10px' }}>
+                        <p style={{ fontWeight: 'bold', marginBottom: '15px', fontSize: '1.1rem' }}>{i + 1}. {q.question}</p>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {q.options.map((opt, j) => {
+                            // Dynamic styling for correct/incorrect answers
+                            let btnStyle = { 
+                              padding: '12px', textAlign: 'left', borderRadius: '8px', 
+                              cursor: 'pointer', border: '1px solid rgba(255,255,255,0.2)', 
+                              background: 'transparent', color: 'var(--text-color)', transition: '0.3s'
+                            };
+                            
+                            if (answered) {
+                              if (opt === q.answer) {
+                                btnStyle.background = 'rgba(46, 204, 113, 0.2)'; // Green
+                                btnStyle.border = '1px solid #2ecc71';
+                              } else if (opt === answered.selected && !answered.isCorrect) {
+                                btnStyle.background = 'rgba(231, 76, 60, 0.2)'; // Red
+                                btnStyle.border = '1px solid #e74c3c';
+                              }
+                              btnStyle.cursor = 'default';
+                            }
+
+                            return (
+                              <button 
+                                key={j} 
+                                style={btnStyle}
+                                onMouseOver={(e) => { if (!answered) e.target.style.background = 'rgba(255,255,255,0.1)' }}
+                                onMouseOut={(e) => { if (!answered) e.target.style.background = 'transparent' }}
+                                onClick={() => {
+                                  // Lock answer once clicked
+                                  if (!answered) {
+                                    setSelectedAnswers(prev => ({
+                                      ...prev,
+                                      [i]: { selected: opt, isCorrect: opt === q.answer }
+                                    }));
+                                  }
+                                }}
+                              >
+                                {opt}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Show feedback message */}
+                        {answered && (
+                          <p style={{ marginTop: '12px', fontWeight: 'bold', color: answered.isCorrect ? '#2ecc71' : '#e74c3c' }}>
+                            {answered.isCorrect ? '✅ Correct!' : `❌ Incorrect. The correct answer is: ${q.answer}`}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Show Final Score if all questions are answered */}
+                  {quiz && Object.keys(selectedAnswers).length === quiz.length && quiz.length > 0 && (
+                    <div style={{ marginTop: '30px', padding: '20px', background: 'rgba(46, 204, 113, 0.1)', border: '1px solid #2ecc71', borderRadius: '10px', textAlign: 'center' }}>
+                      <h3 style={{ color: '#2ecc71' }}>Quiz Completed!</h3>
+                      <p style={{ fontSize: '1.2rem', margin: '10px 0' }}>
+                        Your Score: <strong>{Object.values(selectedAnswers).filter(a => a.isCorrect).length} / {quiz.length}</strong>
+                      </p>
+                      <button 
+                        onClick={() => setSelectedAnswers({})} 
+                        className="btn-primary" 
+                        style={{ marginTop: '10px' }}
+                      >
+                        Retake Quiz
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+
+          {/* FLASHCARDS TAB */}
+                   {/* FLASHCARDS TAB */}
+          {activeTab === 'flashcards' && (
+            <div>
+              <h2>Flashcards (Hover to reveal answer)</h2>
+              {loadingFeature ? <p>Generating flashcards...</p> : (
+                <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  {flashcards?.map((card, i) => (
+                    <div key={i} className={styles.flashcardWrapper}>
+                      <div className={styles.flashcardInner}>
+                        <div className={styles.flashcardFront}>
+                          <strong>Q:</strong> {card.front}
+                        </div>
+                        <div className={styles.flashcardBack}>
+                          <strong>A:</strong> {card.back}
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -165,22 +258,6 @@ export default function DocumentStudyView() {
             </div>
           )}
 
-          {/* FLASHCARDS TAB */}
-          {activeTab === 'flashcards' && (
-            <div>
-              <h2>Flashcards (Hover to view back)</h2>
-              {loadingFeature ? <p>Generating flashcards...</p> : (
-                <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                  {flashcards?.map((card, i) => (
-                    <div key={i} className={styles.flashcard}>
-                      <span className="front">Q: {card.front}</span>
-                      {/* You can implement CSS flip animations later, for now we just show the front! */}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
         </div>
       </div>

@@ -36,19 +36,27 @@ const chatWithPdf = async (req, res) => {
             .map(match => match.metadata.text)
             .join('\n\n---\n\n');
 
-        // 4. MOCK AI RESPONSE (because text generation is blocked by billing)
-        // In a real scenario, we would send the 'message' and the 'relevantContext' to Gemini.
-        const mockResponse = `This is a simulated AI response. I have successfully searched your database and found relevant information!\n\nHere is what I found in the PDF regarding your question:\n\n${relevantContext}`;
+        // 4. REAL AI RESPONSE using the context retrieved from Pinecone
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        
+        const prompt = `You are a highly intelligent study assistant. Answer the user's question based strictly on the provided context extracted from their document. If the context does not contain the answer, politely say that you cannot find the answer in the document. Do not invent information.
+
+Context from Document:
+${relevantContext}
+
+User Question: ${message}`;
+
+        const chatResult = await model.generateContent(prompt);
+        const aiResponse = chatResult.response.text();
 
         res.json({ 
-            reply: mockResponse,
-            // We return the raw matches too, so you can show interviewers that the RAG vector search actually works!
+            reply: aiResponse,
             vectorMatches: queryResponse.matches.length 
         });
 
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: error.message });
+        console.error("Chat Error:", error);
+        res.status(500).json({ message: "Failed to generate chat response." });
     }
 };
 
